@@ -33,4 +33,12 @@ To run:
 bun run index.ts
 ```
 
+## To host
+
+Best place to host is something like [Digital Ocean](https://m.do.co/c/a78810eb0cff). Set up a droplet and deploy the app there.
+
+If I get around to it, [dropship](https://github.com/jamonholmgren/dropship) will be an amazing CLI to deploy to a droplet. But it's not ready yet!
+
+---
+
 This project was created using `bun init` in bun v1.1.27. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.
