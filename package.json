@@ -1,12 +1,10 @@
 {
-  "name": "jamon.me",
+  "name": "jmn",
+  "description": "A simple URL shortener written in Bun",
   "module": "index.ts",
   "type": "module",
   "devDependencies": {
     "@types/bun": "latest"
-  },
-  "peerDependencies": {
-    "typescript": "^5.0.0"
   },
   "prettier": {
     "semi": false,
