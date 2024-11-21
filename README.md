@@ -19,10 +19,11 @@ A lightweight URL shortener service built with Bun. Creates short URLs in the fo
 Add the following to your `.env` file:
 
 ```
-URLS_DIR=./urls
+PORT=411
+URLS_DIR=urls
+ADD_PATH=new
 PASSWORD=your-password
 MAIN_REDIRECT=https://example.com
-PORT=3000
 RATE_LIMIT_MAX=10
 RATE_LIMIT_TIME=1
 ```
