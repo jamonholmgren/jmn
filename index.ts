@@ -3,7 +3,8 @@ import { mkdir } from "node:fs/promises"
 
 // Add to your .env file at the root of your project
 const PASSWORD = process.env.SHORTENER_PASSWORD || "password"
-const URLS_DIR = process.env.URLS_DIR || "./urls"
+const URLS_DIR = process.env.URLS_DIR || "urls"
+const ADD_PATH = process.env.ADD_PATH || "new"
 const MAIN_REDIRECT = process.env.MAIN_REDIRECT || "https://example.com"
 const PORT = process.env.PORT || 411
 const RATE_LIMIT_MAX = parseInt(process.env.RATE_LIMIT_MAX || "10", 10) || 10
@@ -196,7 +197,7 @@ serve({
     if (url.pathname === "/") return new Response(null, { status: 301, headers: { Location: MAIN_REDIRECT } })
 
     // URL creation form
-    if (url.pathname === "/make") {
+    if (url.pathname === `/${ADD_PATH}`) {
       if (req.method === "GET") {
         return new Response(getHTML(domain).replace("{{message}}", ""), { headers: { "Content-Type": "text/html" } })
       }
