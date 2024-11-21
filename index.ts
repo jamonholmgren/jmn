@@ -214,7 +214,7 @@ serve({
       if (req.method === "POST") {
         const formData = await req.formData()
         const targetUrl = formData.get("url")?.toString()
-        const shortname = formData.get("shortname")?.toString()
+        const shortname = formData.get("shortname")?.toString().replace("/", "")
         const password = formData.get("password")?.toString()
 
         if (!targetUrl || !shortname || !password) {
@@ -243,7 +243,7 @@ serve({
           return new Response(
             getHTML(domain, { url: targetUrl, shortname }).replace(
               "{{message}}",
-              `<div class="error">Invalid password (${RATE_LIMIT_MAX - failedAttempts} attempts remaining)</div>`
+              `<div class="error">Invalid password</div>`
             ),
             { headers: { "Content-Type": "text/html" } }
           )
@@ -279,7 +279,7 @@ serve({
       if (!targetUrl) return new Response("Invalid URL", { status: 404 })
 
       // Prevent redirect loops
-      if (targetUrl.startsWith(domain)) return new Response("Invalid URL", { status: 404 })
+      if (targetUrl.startsWith(`https://${domain}/`)) return new Response("Invalid URL", { status: 404 })
 
       return new Response(null, { status: 301, headers: { Location: targetUrl } })
     }
