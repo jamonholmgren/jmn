@@ -39,11 +39,12 @@ const getHTML = (domain: string, formData?: { url?: string; shortname?: string }
       font-family: system-ui, -apple-system, sans-serif;
       max-width: 600px;
       margin: 0 auto;
-      padding: 0 1rem;
+      padding: 2rem 1rem;
       line-height: 1.5;
       min-height: 100vh;
       display: flex;
-      align-items: center;
+      flex-direction: column;
+      justify-content: center;
       background: var(--bg);
       color: var(--text);
     }
@@ -53,6 +54,7 @@ const getHTML = (domain: string, formData?: { url?: string; shortname?: string }
       padding: 2rem;
       border-radius: 12px;
       box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+      margin-bottom: 0.5rem;
     }
     h1 {
       margin-top: 0;
@@ -154,16 +156,22 @@ const getHTML = (domain: string, formData?: { url?: string; shortname?: string }
         value="${formData?.url || ""}"
         autocomplete="off"
       />
-      <input
-        type="password"
-        name="password"
-        placeholder="Password"
-        required
-        autocomplete="new-password"
-      />
-      <button type="submit">Create Short URL</button>
+      <div style="display: flex; gap: 1rem;">
+        <input
+          type="password"
+          name="password"
+          placeholder="Password"
+          required
+          autocomplete="new-password"
+          style="flex: 1;"
+        />
+        <button type="submit" style="min-width: 120px;">Create Short URL</button>
+      </div>
     </form>
     {{message}}
+  </div>
+  <div style="text-align: center; color: #94a3b8; font-size: 0.75rem;">
+    powered by <a href="https://jamon.me/jmn" target="_blank" style="color: inherit;">jmn</a>
   </div>
 </body>
 </html>`
