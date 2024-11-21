@@ -288,4 +288,8 @@ serve({
   },
 })
 
-console.log(`URL shortener running at http://localhost:${PORT}`)
+console.log(`\n`)
+console.log(`URL Shortener JMN - https://jamon.me/jmn`)
+console.log(`Server: http://localhost:${PORT}`)
+console.log(`Create: http://localhost:${PORT}/${ADD_PATH}`)
+console.log(`\n`)
