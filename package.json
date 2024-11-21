@@ -7,5 +7,9 @@
   },
   "peerDependencies": {
     "typescript": "^5.0.0"
+  },
+  "prettier": {
+    "semi": false,
+    "printWidth": 120
   }
 }

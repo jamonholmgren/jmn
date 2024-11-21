@@ -1,20 +1,21 @@
-import { serve } from "bun";
-import { mkdir } from "node:fs/promises";
+import { serve } from "bun"
+import { mkdir } from "node:fs/promises"
 
 // Add to your .env file at the root of your project
-const URLS_DIR = process.env.URLS_DIR;
-const PASSWORD = process.env.SHORTENER_PASSWORD;
-const MAIN_REDIRECT = process.env.MAIN_REDIRECT;
+const PASSWORD = process.env.SHORTENER_PASSWORD || "password"
+const URLS_DIR = process.env.URLS_DIR || "./urls"
+const MAIN_REDIRECT = process.env.MAIN_REDIRECT || "https://example.com"
+const PORT = process.env.PORT || 411
+const RATE_LIMIT_MAX = parseInt(process.env.RATE_LIMIT_MAX || "10", 10) || 10
+const RATE_LIMIT_TIME = parseInt(process.env.RATE_LIMIT_TIME || "1", 10) || 1
+const RATE_LIMIT_WINDOW = RATE_LIMIT_TIME * 60 * 1000 // 1 minute in milliseconds
 
-if (!URLS_DIR || !PASSWORD || !MAIN_REDIRECT) {
-  throw new Error("Missing environment variables in .env file.");
+if (!URLS_DIR || !PASSWORD || !MAIN_REDIRECT || !PORT) {
+  throw new Error("Missing environment variables in .env file.")
 }
 
 // Move HTML template to a function to inject dynamic domain
-const getHTML = (
-  domain: string,
-  formData?: { url?: string; shortname?: string }
-) => `<!DOCTYPE html>
+const getHTML = (domain: string, formData?: { url?: string; shortname?: string }) => `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
@@ -164,38 +165,47 @@ const getHTML = (
     {{message}}
   </div>
 </body>
-</html>`;
+</html>`
 
 // Ensure urls directory exists
-await mkdir(URLS_DIR, { recursive: true });
+await mkdir(URLS_DIR, { recursive: true })
+
+let failedAttempts = 0
+let isBlocked = () => failedAttempts >= RATE_LIMIT_MAX
+
+// Reset failed attempts counter every minute
+setInterval(() => {
+  failedAttempts = 0
+}, RATE_LIMIT_WINDOW)
 
 serve({
   port: 411,
   async fetch(req) {
-    const url = new URL(req.url);
-    const domain = url.host;
+    const url = new URL(req.url)
+    const domain = url.host
+
+    // Check if service is blocked due to too many failed attempts
+    if (isBlocked()) {
+      return new Response(
+        getHTML(domain).replace("{{message}}", `<div class="error">Service temporarily unavailable.</div>`),
+        { status: 503, headers: { "Content-Type": "text/html" } }
+      )
+    }
 
     // Root path redirect
-    if (url.pathname === "/") {
-      return new Response(null, {
-        status: 301,
-        headers: { Location: MAIN_REDIRECT },
-      });
-    }
+    if (url.pathname === "/") return new Response(null, { status: 301, headers: { Location: MAIN_REDIRECT } })
 
     // URL creation form
     if (url.pathname === "/make") {
       if (req.method === "GET") {
-        return new Response(getHTML(domain).replace("{{message}}", ""), {
-          headers: { "Content-Type": "text/html" },
-        });
+        return new Response(getHTML(domain).replace("{{message}}", ""), { headers: { "Content-Type": "text/html" } })
       }
 
       if (req.method === "POST") {
-        const formData = await req.formData();
-        const targetUrl = formData.get("url")?.toString();
-        const shortname = formData.get("shortname")?.toString();
-        const password = formData.get("password")?.toString();
+        const formData = await req.formData()
+        const targetUrl = formData.get("url")?.toString()
+        const shortname = formData.get("shortname")?.toString()
+        const password = formData.get("password")?.toString()
 
         if (!targetUrl || !shortname || !password) {
           return new Response(
@@ -204,21 +214,36 @@ serve({
               `<div class="error">All fields are required</div>`
             ),
             { headers: { "Content-Type": "text/html" } }
-          );
+          )
         }
 
         if (password !== PASSWORD) {
+          failedAttempts++
+
+          if (isBlocked()) {
+            return new Response(
+              getHTML(domain, { url: targetUrl, shortname }).replace(
+                "{{message}}",
+                `<div class="error">Too many failed attempts. Service temporarily unavailable. Please try again in a minute.</div>`
+              ),
+              { status: 503, headers: { "Content-Type": "text/html", "Retry-After": "60" } }
+            )
+          }
+
           return new Response(
             getHTML(domain, { url: targetUrl, shortname }).replace(
               "{{message}}",
-              `<div class="error">Invalid password</div>`
+              `<div class="error">Invalid password (${RATE_LIMIT_MAX - failedAttempts} attempts remaining)</div>`
             ),
             { headers: { "Content-Type": "text/html" } }
-          );
+          )
         }
 
-        const shortUrl = `https://${domain}/${shortname}`;
-        await Bun.write(`${URLS_DIR}/${shortname}.url`, targetUrl);
+        // Reset failed attempts on successful password
+        failedAttempts = 0
+
+        const shortUrl = `https://${domain}/${shortname}`
+        await Bun.write(`${URLS_DIR}/${shortname}.url`, targetUrl)
 
         return new Response(
           getHTML(domain, { url: targetUrl, shortname }).replace(
@@ -230,28 +255,27 @@ serve({
             </div>`
           ),
           { headers: { "Content-Type": "text/html" } }
-        );
+        )
       }
     }
 
     // Handle short URLs
-    const shortname = url.pathname.slice(1);
-    const urlFile = `${URLS_DIR}/${shortname}.url`;
-    const file = Bun.file(urlFile);
+    const shortname = url.pathname.slice(1)
+    const urlFile = `${URLS_DIR}/${shortname}.url`
+    const file = Bun.file(urlFile)
 
     if (await file.exists()) {
-      const targetUrl = (await file.text()).trim();
-      if (!targetUrl) {
-        return new Response("Invalid URL", { status: 404 });
-      }
-      return new Response(null, {
-        status: 301,
-        headers: { Location: targetUrl },
-      });
+      const targetUrl = (await file.text()).trim()
+      if (!targetUrl) return new Response("Invalid URL", { status: 404 })
+
+      // avoid redirecting to the same domain
+      if (targetUrl.startsWith(domain)) return new Response("Invalid URL", { status: 404 })
+
+      return new Response(null, { status: 301, headers: { Location: targetUrl } })
     }
 
-    return new Response("Not found", { status: 404 });
+    return new Response("Not found", { status: 404 })
   },
-});
+})
 
-console.log("URL shortener running at http://localhost:411");
+console.log(`URL shortener running at http://localhost:${PORT}`)

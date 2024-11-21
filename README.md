@@ -16,10 +16,15 @@ A lightweight URL shortener service built with Bun. Creates short URLs in the fo
 
 ## Installation
 
-To install dependencies:
+Add the following to your `.env` file:
 
-```bash
-bun install
+```
+URLS_DIR=./urls
+PASSWORD=your-password
+MAIN_REDIRECT=https://example.com
+PORT=3000
+RATE_LIMIT_MAX=10
+RATE_LIMIT_TIME=1
 ```
 
 To run:
