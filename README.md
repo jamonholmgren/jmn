@@ -2,6 +2,8 @@
 
 A lightweight URL shortener service built with Bun. Creates short URLs in the format `example.com/shortname` that redirect to their target URLs.
 
+<img alt="JMN Screenshot" width="400" src="./.github/jmn-screenshot.png" />
+
 ## Features
 
 - Create short URLs via web form at `/new` (or whatever you specify)
