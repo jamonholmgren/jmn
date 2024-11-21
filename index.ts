@@ -1,7 +1,7 @@
 import { serve } from "bun"
 import { mkdir } from "node:fs/promises"
 
-// Add to your .env file at the root of your project
+// Quick env setup - add these to your .env file
 const PASSWORD = process.env.SHORTENER_PASSWORD || "password"
 const URLS_DIR = process.env.URLS_DIR || "urls"
 const ADD_PATH = process.env.ADD_PATH || "new"
@@ -9,7 +9,7 @@ const MAIN_REDIRECT = process.env.MAIN_REDIRECT || "https://example.com"
 const PORT = process.env.PORT || 411
 const RATE_LIMIT_MAX = parseInt(process.env.RATE_LIMIT_MAX || "10", 10) || 10
 const RATE_LIMIT_TIME = parseInt(process.env.RATE_LIMIT_TIME || "1", 10) || 1
-const RATE_LIMIT_WINDOW = RATE_LIMIT_TIME * 60 * 1000 // 1 minute in milliseconds
+const RATE_LIMIT_WINDOW = RATE_LIMIT_TIME * 60 * 1000
 
 if (!URLS_DIR || !PASSWORD || !MAIN_REDIRECT || !PORT) {
   throw new Error("Missing environment variables in .env file.")
@@ -176,13 +176,14 @@ const getHTML = (domain: string, formData?: { url?: string; shortname?: string }
 </body>
 </html>`
 
-// Ensure urls directory exists
+// Create urls directory if it doesn't exist
 await mkdir(URLS_DIR, { recursive: true })
 
+// Track failed password attempts for rate limiting
 let failedAttempts = 0
 let isBlocked = () => failedAttempts >= RATE_LIMIT_MAX
 
-// Reset failed attempts counter every minute
+// Reset rate limit counter periodically
 setInterval(() => {
   failedAttempts = 0
 }, RATE_LIMIT_WINDOW)
@@ -193,7 +194,7 @@ serve({
     const url = new URL(req.url)
     const domain = url.host
 
-    // Check if service is blocked due to too many failed attempts
+    // Block requests if too many failed password attempts
     if (isBlocked()) {
       return new Response(
         getHTML(domain).replace("{{message}}", `<div class="error">Service temporarily unavailable.</div>`),
@@ -201,10 +202,10 @@ serve({
       )
     }
 
-    // Root path redirect
+    // Redirect root to main site
     if (url.pathname === "/") return new Response(null, { status: 301, headers: { Location: MAIN_REDIRECT } })
 
-    // URL creation form
+    // Handle URL creation form
     if (url.pathname === `/${ADD_PATH}`) {
       if (req.method === "GET") {
         return new Response(getHTML(domain).replace("{{message}}", ""), { headers: { "Content-Type": "text/html" } })
@@ -268,7 +269,7 @@ serve({
       }
     }
 
-    // Handle short URLs
+    // Look up and redirect short URLs
     const shortname = url.pathname.slice(1)
     const urlFile = `${URLS_DIR}/${shortname}.url`
     const file = Bun.file(urlFile)
@@ -277,7 +278,7 @@ serve({
       const targetUrl = (await file.text()).trim()
       if (!targetUrl) return new Response("Invalid URL", { status: 404 })
 
-      // avoid redirecting to the same domain
+      // Prevent redirect loops
       if (targetUrl.startsWith(domain)) return new Response("Invalid URL", { status: 404 })
 
       return new Response(null, { status: 301, headers: { Location: targetUrl } })
