@@ -4,7 +4,7 @@ A lightweight URL shortener service built with Bun. Creates short URLs in the fo
 
 ## Features
 
-- Create short URLs via web form at `/make`
+- Create short URLs via web form at `/new` (or whatever you specify)
 - Permanent (301) redirects
 - File-based storage (no database required)
 - Simple password protection for URL creation
