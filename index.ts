@@ -189,7 +189,7 @@ setInterval(() => {
 }, RATE_LIMIT_WINDOW)
 
 serve({
-  port: 411,
+  port: process.env.PORT || 4111,
   async fetch(req) {
     const url = new URL(req.url)
     const domain = url.host
@@ -289,7 +289,7 @@ serve({
 })
 
 console.log(`\n`)
-console.log(`URL Shortener JMN - https://jamon.me/jmn`)
+console.log(`URL Shortener powered by jmn (https://jamon.me/jmn)`)
 console.log(`Server: http://localhost:${PORT}`)
 console.log(`Create: http://localhost:${PORT}/${ADD_PATH}`)
 console.log(`\n`)
