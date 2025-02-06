@@ -2,7 +2,7 @@ import { serve } from "bun"
 import { mkdir } from "node:fs/promises"
 
 // Quick env setup - add these to your .env file
-const PASSWORD = process.env.SHORTENER_PASSWORD || "password"
+const PASSWORD = process.env.PASSWORD || "password"
 const URLS_DIR = process.env.URLS_DIR || "urls"
 const ADD_PATH = process.env.ADD_PATH || "new"
 const MAIN_REDIRECT = process.env.MAIN_REDIRECT || "https://example.com"
