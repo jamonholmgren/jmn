@@ -518,11 +518,78 @@ const server = serve({
             `<div class="success">
               URL created! <a href="${shortUrl}" target="_blank">${shortUrl}</a>
               <br><br>
-              <a href="/make">Create another</a>
+              Create another: <a href="/make">${domain}/make</a>
+              <br><br>
+              Stats: <a href="/stats/${shortname}">${domain}/stats/${shortname}</a>
             </div>`
           ),
           { headers: { "Content-Type": "text/html" } }
         )
+      }
+    }
+
+    // Check if the path starts with /stats/ and extract the shorturl
+    if (url.pathname.startsWith("/stats/")) {
+      const shortname = url.pathname.split("/stats/")[1].trim()
+      if (req.method === "GET") {
+        return new Response(getStatsHTML(domain, { shortname }), { headers: { "Content-Type": "text/html" } })
+      }
+
+      if (req.method === "POST") {
+        const formData = await req.formData()
+        const formShortname = formData.get("shortname")?.toString().trim()
+        const password = formData.get("password")?.toString()
+
+        if (!formShortname || !password) {
+          return new Response(
+            getStatsHTML(domain, { shortname: formShortname }, `<div class="error">All fields are required</div>`),
+            {
+              headers: { "Content-Type": "text/html" },
+            }
+          )
+        }
+
+        if (password !== PASSWORD) {
+          failedAttempts++
+          if (isBlocked()) {
+            return new Response(
+              getStatsHTML(
+                domain,
+                { shortname: formShortname },
+                `<div class="error">Too many failed attempts. Service temporarily unavailable. Please try again in a minute.</div>`
+              ),
+              { status: 503, headers: { "Content-Type": "text/html", "Retry-After": "60" } }
+            )
+          }
+          return new Response(
+            getStatsHTML(domain, { shortname: formShortname }, `<div class="error">Invalid password</div>`),
+            {
+              headers: { "Content-Type": "text/html" },
+            }
+          )
+        }
+
+        // Reset failed attempts on successful password
+        failedAttempts = 0
+
+        const statsPath = `stats/${formShortname}.json`
+        const statsFile = Bun.file(statsPath)
+        if (!(await statsFile.exists())) {
+          return new Response(
+            getStatsHTML(
+              domain,
+              { shortname: formShortname },
+              `<div class="error">No stats found for this short URL.</div>`
+            ),
+            { headers: { "Content-Type": "text/html" } }
+          )
+        }
+        const rawStats = await statsFile.text()
+        const statsData = JSON.parse(rawStats)
+
+        return new Response(getStatsDisplayHTML(domain, statsData, formShortname), {
+          headers: { "Content-Type": "text/html" },
+        })
       }
     }
 
