@@ -2,7 +2,7 @@ import { serve } from "bun"
 import { mkdir } from "node:fs/promises"
 
 // Quick env setup - add these to your .env file
-const PASSWORD = process.env.SHORTENER_PASSWORD || "password"
+const PASSWORD = process.env.PASSWORD || "password"
 const URLS_DIR = process.env.URLS_DIR || "urls"
 const ADD_PATH = process.env.ADD_PATH || "new"
 const MAIN_REDIRECT = process.env.MAIN_REDIRECT || "https://example.com"
@@ -412,7 +412,7 @@ const getStatsDisplayHTML = (domain: string, stats: any, shortname: string) => {
 }
 
 const server = serve({
-  port: 411,
+  port: process.env.PORT || 4111,
   async fetch(req) {
     const url = new URL(req.url)
     const domain = url.host
@@ -626,7 +626,7 @@ const server = serve({
 })
 
 console.log(`\n`)
-console.log(`URL Shortener JMN - https://jamon.me/jmn`)
+console.log(`URL Shortener powered by jmn (https://jamon.me/jmn)`)
 console.log(`Server: http://localhost:${PORT}`)
 console.log(`Create: http://localhost:${PORT}/${ADD_PATH}`)
 console.log(`Stats:  http://localhost:${PORT}/stats`)
