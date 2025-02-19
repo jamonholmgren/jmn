@@ -44,7 +44,7 @@ confirm() {
 }
 
 # --- Preamble: DigitalOcean Domain Setup ---
-echo -e "${BOLD}*Setting up your domain*${CLR}\n"
+echo -e "${BOLD}Setting up your domain${CLR}\n"
 echo "1. Log in to DigitalOcean."
 echo "2. Go to 'Networking' -> 'Domains'."
 echo "     https://cloud.digitalocean.com/networking/domains"
@@ -82,7 +82,7 @@ fi
 site_name="$1"
 port="$2"
 domain_name="$site_name" # Assuming site_name is the domain name
-echo -e "${BOLD}*Adding site to droplet*${CLR}"
+echo -e "${BOLD}Adding site to droplet${CLR}"
 printf '%s\n' "⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯"
 echo -e "Site: $site_name"
 echo -e "Port: $port"
@@ -96,7 +96,7 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # --- DNS Check ---
-info "Checking DNS propagation for $domain_name..."
+# info "Checking DNS propagation for $domain_name..."
 if ! check_dns "$domain_name"; then
   if confirm "DNS check failed. Continue anyway?"; then
     info "Continuing despite DNS check failure."
@@ -107,7 +107,7 @@ if ! check_dns "$domain_name"; then
 fi
 
 # --- Nginx Vhost Setup ---
-info "Setting up Nginx vhost..."
+# info "Setting up Nginx vhost..."
 vhost_file="/etc/nginx/sites-available/$domain_name"
 vhost_enabled="/etc/nginx/sites-enabled/$domain_name"
 
@@ -160,7 +160,7 @@ server {
 fi
 
 # --- Systemd Service Setup ---
-info "Setting up Systemd service..."
+# info "Setting up Systemd service..."
 service_file="/etc/systemd/system/$domain_name.service"
 
 if [ -f "$service_file" ]; then
@@ -206,7 +206,7 @@ WantedBy=multi-user.target
 fi
 
 # --- SSL Certificate Setup ---
-info "Setting up SSL certificate with Certbot..."
+# info "Setting up SSL certificate with Certbot..."
 
 if ! command -v certbot &> /dev/null; then
   warning "Certbot is not installed."
