@@ -55,6 +55,10 @@ fi
 
 site_name="$1"
 domain_name="$site_name"  # Assuming site_name is the domain name
+if [ -z "$domain_name" ]; then
+  error "Domain name is empty. Aborting."
+  exit 1
+fi
 
 # Header
 echo -e "${BOLD}Removing site from droplet${CLR}"
@@ -120,18 +124,16 @@ sudo systemctl restart nginx
 success "Nginx restarted"
 
 # --- Remove SSL Certificate ---
-if command -v certbot &>/dev/null; then
-  if confirm "Do you want to remove the SSL certificate for $domain_name?"; then
-    echo -e "${YELLOW}Removing SSL certificate for $domain_name...${CLR}"
-    sudo certbot delete --cert-name "$domain_name"
-    if [ $? -eq 0 ]; then
-      success "SSL certificate for $domain_name removed"
-    else
-      error "Failed to remove SSL certificate for $domain_name"
-    fi
+if confirm "Do you want to remove the SSL certificate for $domain_name (all associated files)?"; then
+  echo -e "${YELLOW}Removing SSL certificate files for $domain_name using certbot delete...${CLR}"
+  sudo certbot delete --cert-name "$domain_name"
+  if [ $? -eq 0 ]; then
+    success "SSL certificate for $domain_name removed"
   else
-    info "Skipping SSL certificate removal."
+    error "Failed to remove SSL certificate for $domain_name"
   fi
+else
+  info "Skipping SSL certificate removal."
 fi
 
 # Final message
