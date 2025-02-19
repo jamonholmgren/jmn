@@ -1,0 +1,10 @@
+#!/bin/bash
+
+# Deploy from local to all remotes
+
+git pull origin main
+git push origin main
+git push 8rd main
+git push inf main
+git push jme main
+
