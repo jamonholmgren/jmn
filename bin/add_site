@@ -44,22 +44,20 @@ confirm() {
 }
 
 # --- Preamble: DigitalOcean Domain Setup ---
-info "Setting up your domain on DigitalOcean:"
+echo -e "${BOLD}*Setting up your domain*${CLR}\n"
+echo "1. Log in to DigitalOcean."
+echo "2. Go to 'Networking' -> 'Domains'."
+echo "     https://cloud.digitalocean.com/networking/domains"
+echo "3. Add your domain (e.g., jamon.me)."
+echo "4. Add an '@' hostname that points to this droplet with TTL 600."
+echo "5. Change the domain's DNS servers to be:"
+echo "     ns1.digitalocean.com"
+echo "     ns2.digitalocean.com"
+echo "     ns3.digitalocean.com"
+echo "6. Wait for DNS propagation (can take up to 48 hours)."
 echo ""
-echo -e "${CYAN}1. Log in to your DigitalOcean account.${CLR}"
-echo -e "${CYAN}2. Go to 'Networking' -> 'Domains'."
-echo -e "${GRAY}     https://cloud.digitalocean.com/networking/domains${CLR}"
-echo -e "${CYAN}3. Add your domain (e.g., jamon.me).${CLR}"
-echo -e "${CYAN}4. Add an '@' hostname that points to this drolet with TTL 600.${CLR}"
-echo -e "${CYAN}5. Change the domain's DNS servers to be:${CLR}"
-echo -e "${CYAN}     ${BOLD}ns1.digitalocean.com${UNBOLD}${CLR}"
-echo -e "${CYAN}     ${BOLD}ns2.digitalocean.com${UNBOLD}${CLR}"
-echo -e "${CYAN}     ${BOLD}ns3.digitalocean.com${UNBOLD}${CLR}"
-echo -e "${CYAN}4. Add the following DNS records:${CLR}"
-echo -e "${CYAN}   - A record: @ points to your server's IP address${CLR}"
-echo -e "${CYAN}   - A record: www points to your server's IP address${CLR}"
-echo -e "${CYAN}   - (Optional) MX records for email${CLR}"
-echo -e "${CYAN}5. Wait for DNS propagation (can take up to 48 hours).${CLR}${CLR}"
+printf '%s\n' "⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯"
+echo ""
 
 # --- DNS Check Function ---
 check_dns() {
@@ -71,7 +69,7 @@ check_dns() {
     return 1
   fi
 
-  info "DNS is pointing to: $ip"
+  echo -e "${GREEN}✅ DNS for $domain set to $ip${CLR}"
   return 0
 }
 
@@ -84,6 +82,12 @@ fi
 site_name="$1"
 port="$2"
 domain_name="$site_name" # Assuming site_name is the domain name
+echo -e "${BOLD}*Adding site to droplet*${CLR}"
+printf '%s\n' "⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯"
+echo -e "Site: $site_name"
+echo -e "Port: $port"
+printf '%s\n' "⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯"
+echo ""
 
 # --- Check if running as root ---
 if [[ $EUID -ne 0 ]]; then
@@ -134,22 +138,25 @@ server {
 "
 
   echo "$vhost_content" | sudo tee "$vhost_file" >/dev/null
+  echo -e "${GREEN}✅ Created nginx site ${vhost_file}${CLR}"
 
   if [ ! -L "$vhost_enabled" ]; then
     sudo ln -s "$vhost_file" "$vhost_enabled"
-    success "Created symbolic link for Nginx vhost."
+    echo -e "${GREEN}✅ Created nginx symlink ${vhost_enabled}${CLR}"
   else
-    warning "Symbolic link already exists: $vhost_enabled"
+    echo -e "${GREEN}✅ Verified nginx symlink ${vhost_enabled}${CLR}"
   fi
 
-  sudo nginx -t
+  sudo nginx -t &>/dev/null
   if [ $? -ne 0 ]; then
     error "Nginx configuration test failed. Check your vhost file."
     exit 1
   fi
+  echo -e "${GREEN}✅ Nginx syntax validated ok${CLR}"
+  echo -e "${GREEN}✅ Nginx configuration test validated ok${CLR}"
 
   sudo systemctl restart nginx
-  success "Nginx restarted."
+  echo -e "${GREEN}✅ Nginx restarted${CLR}"
 fi
 
 # --- Systemd Service Setup ---
@@ -193,9 +200,9 @@ WantedBy=multi-user.target
     error "Failed to start Systemd service."
     exit 1
   fi
-
-  sudo systemctl status "$domain_name"
-  success "Systemd service started."
+  
+  echo -e "${GREEN}✅ Systemd service created${CLR}"
+  echo -e "${GREEN}✅ Systemd service running${CLR}"
 fi
 
 # --- SSL Certificate Setup ---
@@ -220,11 +227,12 @@ if [ ! "$skip_certbot" ]; then
       exit 1
     fi
     sudo systemctl enable certbot.timer
-    success "SSL certificate obtained and configured."
+    echo -e "${GREEN}✅ SSL certificate obtained and configured${CLR}"
+    echo -e "${GREEN}✅ SSL certificate auto-renewal configured${CLR}"
   else
     info "Skipping SSL certificate setup."
   fi
 fi
 
-success "All steps completed!"
+echo -e "\nAll steps completed! Happy coding!"
 
