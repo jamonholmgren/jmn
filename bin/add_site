@@ -124,7 +124,7 @@ if [ ! "$skip_nginx" ]; then
 server {
     listen 80;
     listen [::]:80;
-    server_name $domain_name www.$domain_name;
+    server_name $domain_name;
 
     location / {
         proxy_pass http://localhost:$port;
@@ -221,7 +221,7 @@ fi
 
 if [ ! "$skip_certbot" ]; then
   if confirm "Run Certbot to obtain SSL certificate?"; then
-    sudo certbot --nginx -d "$domain_name" -d "www.$domain_name"
+    sudo certbot --nginx -d "$domain_name"
     if [ $? -ne 0 ]; then
       error "Certbot failed. Check the output for errors."
       exit 1
