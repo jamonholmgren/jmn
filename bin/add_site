@@ -1,0 +1,230 @@
+#!/bin/bash
+
+# This is for adding a new site to a DigitalOcean Droplet.
+# Assumes you already have nginx installed and running.
+
+# Color definitions
+RED="\033[0;31m"
+GREEN="\033[0;32m"
+YELLOW="\033[0;33m"
+BLUE="\033[0;34m"
+MAGENTA="\033[0;35m"
+CYAN="\033[0;36m"
+WHITE="\033[0;37m"
+GRAY="\033[0;90m"
+BOLD="\033[1m"
+UNBOLD="\033[0m"
+CLR="\033[0m"
+
+# Function to display messages
+info()    {
+  echo -e "${WHITE}${BOLD}INFO:${UNBOLD}${CLR} ${WHITE}$1${CLR}"
+}
+success() {
+  echo -e "${GREEN}${BOLD}SUCCESS:${UNBOLD}${CLR} ${GREEN}$1${CLR}"
+}
+warning() {
+  echo -e "${YELLOW}${BOLD}WARNING:${UNBOLD}${CLR} ${YELLOW}$1${CLR}"
+}
+error()   {
+  echo -e "${RED}${BOLD}ERROR:${UNBOLD}${CLR} ${RED}$1${CLR}"
+}
+
+# Function to prompt user for confirmation
+confirm() {
+  read -r -p "$1 [y/N]: " response
+  case "$response" in
+  [yY][eE][sS] | [yY])
+    true
+    ;;
+  *)
+    false
+    ;;
+  esac
+}
+
+# --- Preamble: DigitalOcean Domain Setup ---
+info "Setting up your domain on DigitalOcean:"
+echo ""
+echo -e "${CYAN}1. Log in to your DigitalOcean account.${CLR}"
+echo -e "${CYAN}2. Go to 'Networking' -> 'Domains'."
+echo -e "${GRAY}     https://cloud.digitalocean.com/networking/domains${CLR}"
+echo -e "${CYAN}3. Add your domain (e.g., jamon.me).${CLR}"
+echo -e "${CYAN}4. Add an '@' hostname that points to this drolet with TTL 600.${CLR}"
+echo -e "${CYAN}5. Change the domain's DNS servers to be:${CLR}"
+echo -e "${CYAN}     ${BOLD}ns1.digitalocean.com${UNBOLD}${CLR}"
+echo -e "${CYAN}     ${BOLD}ns2.digitalocean.com${UNBOLD}${CLR}"
+echo -e "${CYAN}     ${BOLD}ns3.digitalocean.com${UNBOLD}${CLR}"
+echo -e "${CYAN}4. Add the following DNS records:${CLR}"
+echo -e "${CYAN}   - A record: @ points to your server's IP address${CLR}"
+echo -e "${CYAN}   - A record: www points to your server's IP address${CLR}"
+echo -e "${CYAN}   - (Optional) MX records for email${CLR}"
+echo -e "${CYAN}5. Wait for DNS propagation (can take up to 48 hours).${CLR}${CLR}"
+
+# --- DNS Check Function ---
+check_dns() {
+  domain=$1
+  ip=$(dig +short $domain A)
+
+  if [[ -z "$ip" ]]; then
+    error "DNS not yet propagated for $domain. Please wait and try again."
+    return 1
+  fi
+
+  info "DNS is pointing to: $ip"
+  return 0
+}
+
+# --- Script Arguments ---
+if [ $# -lt 2 ]; then
+  error "Usage: $0 <site_name> <port>"
+  exit 1
+fi
+
+site_name="$1"
+port="$2"
+domain_name="$site_name" # Assuming site_name is the domain name
+
+# --- Check if running as root ---
+if [[ $EUID -ne 0 ]]; then
+  error "This script must be run as root."
+  exit 1
+fi
+
+# --- DNS Check ---
+info "Checking DNS propagation for $domain_name..."
+if ! check_dns "$domain_name"; then
+  if confirm "DNS check failed. Continue anyway?"; then
+    info "Continuing despite DNS check failure."
+  else
+    error "Aborted due to DNS check failure."
+    exit 1
+  fi
+fi
+
+# --- Nginx Vhost Setup ---
+info "Setting up Nginx vhost..."
+vhost_file="/etc/nginx/sites-available/$domain_name"
+vhost_enabled="/etc/nginx/sites-enabled/$domain_name"
+
+if [ -f "$vhost_file" ]; then
+  warning "Nginx vhost file already exists: $vhost_file"
+  if ! confirm "Overwrite existing vhost file?"; then
+    info "Skipping Nginx vhost setup."
+    skip_nginx=true
+  fi
+fi
+
+if [ ! "$skip_nginx" ]; then
+  vhost_content="
+server {
+    listen 80;
+    listen [::]:80;
+    server_name $domain_name www.$domain_name;
+
+    location / {
+        proxy_pass http://localhost:$port;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_cache_bypass \$http_upgrade;
+    }
+}
+"
+
+  echo "$vhost_content" | sudo tee "$vhost_file" >/dev/null
+
+  if [ ! -L "$vhost_enabled" ]; then
+    sudo ln -s "$vhost_file" "$vhost_enabled"
+    success "Created symbolic link for Nginx vhost."
+  else
+    warning "Symbolic link already exists: $vhost_enabled"
+  fi
+
+  sudo nginx -t
+  if [ $? -ne 0 ]; then
+    error "Nginx configuration test failed. Check your vhost file."
+    exit 1
+  fi
+
+  sudo systemctl restart nginx
+  success "Nginx restarted."
+fi
+
+# --- Systemd Service Setup ---
+info "Setting up Systemd service..."
+service_file="/etc/systemd/system/$domain_name.service"
+
+if [ -f "$service_file" ]; then
+  warning "Systemd service file already exists: $service_file"
+  if ! confirm "Overwrite existing Systemd service file?"; then
+    info "Skipping Systemd service setup."
+    skip_systemd=true
+  fi
+fi
+
+if [ ! "$skip_systemd" ]; then
+  service_content="
+[Unit]
+Description=$domain_name application
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/root/$domain_name
+ExecStart=/root/.bun/bin/bun run index.ts
+Restart=always
+Environment=NODE_ENV=production
+StandardOutput=append:/var/log/$domain_name.log
+StandardError=append:/var/log/$domain_name.log
+
+[Install]
+WantedBy=multi-user.target
+"
+
+  echo "$service_content" | sudo tee "$service_file" >/dev/null
+
+  sudo systemctl daemon-reload
+  sudo systemctl enable "$domain_name"
+  sudo systemctl start "$domain_name"
+
+  if [ $? -ne 0 ]; then
+    error "Failed to start Systemd service."
+    exit 1
+  fi
+
+  sudo systemctl status "$domain_name"
+  success "Systemd service started."
+fi
+
+# --- SSL Certificate Setup ---
+info "Setting up SSL certificate with Certbot..."
+
+if ! command -v certbot &> /dev/null; then
+  warning "Certbot is not installed."
+  if confirm "Install Certbot?"; then
+    sudo apt update
+    sudo apt install certbot python3-certbot-nginx -y
+  else
+    info "Skipping Certbot installation."
+    skip_certbot=true
+  fi
+fi
+
+if [ ! "$skip_certbot" ]; then
+  if confirm "Run Certbot to obtain SSL certificate?"; then
+    sudo certbot --nginx -d "$domain_name" -d "www.$domain_name"
+    if [ $? -ne 0 ]; then
+      error "Certbot failed. Check the output for errors."
+      exit 1
+    fi
+    sudo systemctl enable certbot.timer
+    success "SSL certificate obtained and configured."
+  else
+    info "Skipping SSL certificate setup."
+  fi
+fi
+
+success "All steps completed!"
+
