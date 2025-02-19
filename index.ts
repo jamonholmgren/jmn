@@ -260,6 +260,19 @@ const getStatsHTML = (domain: string, formData?: { shortname?: string }, message
 </body>
 </html>`
 
+function formatRelativeDate(date: Date): string {
+  const now = new Date()
+  const diffTime = Math.abs(now.getTime() - date.getTime())
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+
+  if (diffDays === 0) return "Today"
+  if (diffDays === 1) return "Yesterday"
+  if (diffDays < 14) return `${diffDays} days ago`
+  if (diffDays < 63) return `${Math.floor(diffDays / 7)} weeks ago`
+  if (diffDays < 730) return `${Math.floor(diffDays / 30)} months ago`
+  return `${Math.floor(diffDays / 365)} years ago`
+}
+
 const getStatsDisplayHTML = (domain: string, stats: any, shortname: string) => {
   let tableRows = ""
   stats.shorturls.forEach((record: any, index: number) => {
@@ -267,8 +280,8 @@ const getStatsDisplayHTML = (domain: string, stats: any, shortname: string) => {
       .map(([ip, count]) => ip + ": " + count)
       .join(", ")
     tableRows += `<tr>
-      <td><a href=\"#\" onclick=\"showChart(${index}); return false;\">${record.url}</a></td>
-      <td>${record.created}</td>
+      <td><a href="#" onclick="showChart(${index}); return false;">${record.url}</a></td>
+      <td>${formatRelativeDate(new Date(record.created))}</td>
       <td>${record.visits}</td>
       <td>${record.uniques}</td>
       <td>${ips}</td>
@@ -475,7 +488,8 @@ const server = serve({
         // Reset failed attempts on successful password
         failedAttempts = 0
 
-        const shortUrl = `https://${domain}/${shortname}`
+        let shortUrl = `https://${domain}/${shortname}`
+        if (domain.startsWith("localhost")) shortUrl = `http://${domain}/${shortname}`
         await Bun.write(`${URLS_DIR}/${shortname}.url`, targetUrl)
 
         // Update stats for short URL creation
@@ -677,6 +691,16 @@ const server = serve({
             } else {
               urlRecord.ips[visitorIP] = 1
               urlRecord.uniques = (urlRecord.uniques || 0) + 1
+            }
+
+            const today = new Date().toISOString().split("T")[0]
+            if (!urlRecord.dailyClicks) {
+              urlRecord.dailyClicks = {}
+            }
+            if (today in urlRecord.dailyClicks) {
+              urlRecord.dailyClicks[today] += 1
+            } else {
+              urlRecord.dailyClicks[today] = 1
             }
           }
           await Bun.write(statsPath, JSON.stringify(stats, null, 2))
