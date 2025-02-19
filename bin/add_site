@@ -172,6 +172,10 @@ if [ -f "$service_file" ]; then
 fi
 
 if [ ! "$skip_systemd" ]; then
+  # Ask the user for the ExecStart command (default: bun start)
+  read -rp "Enter the ExecStart command for your app (default: bun start): " app_exec_cmd
+  app_exec_cmd=${app_exec_cmd:-bun start}
+  
   service_content="
 [Unit]
 Description=$domain_name application
@@ -180,7 +184,7 @@ After=network.target
 [Service]
 User=root
 WorkingDirectory=/root/$domain_name
-ExecStart=/root/.bun/bin/bun run index.ts
+ExecStart=/usr/bin/env $app_exec_cmd
 Restart=always
 Environment=NODE_ENV=production
 StandardOutput=append:/var/log/$domain_name.log
