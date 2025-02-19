@@ -1,0 +1,138 @@
+#!/bin/bash
+
+# This script removes an existing site from a DigitalOcean Droplet.
+# It removes the Nginx configuration (site file and symlink) and the Systemd service for the site.
+# NOTE: This does not remove SSL certificates. Remove them manually if needed.
+
+# Color definitions
+RED="\033[0;31m"
+GREEN="\033[0;32m"
+YELLOW="\033[0;33m"
+BLUE="\033[0;34m"
+MAGENTA="\033[0;35m"
+CYAN="\033[0;36m"
+WHITE="\033[0;37m"
+GRAY="\033[0;90m"
+BOLD="\033[1m"
+UNBOLD="\033[0m"
+CLR="\033[0m"
+
+# Function to display messages
+info() {
+  echo -e "${WHITE}${BOLD}INFO:${UNBOLD}${CLR} ${WHITE}$1${CLR}"
+}
+
+success() {
+  echo -e "${GREEN}${BOLD}SUCCESS:${UNBOLD}${CLR} ${GREEN}$1${CLR}"
+}
+
+warning() {
+  echo -e "${YELLOW}${BOLD}WARNING:${UNBOLD}${CLR} ${YELLOW}$1${CLR}"
+}
+
+error() {
+  echo -e "${RED}${BOLD}ERROR:${UNBOLD}${CLR} ${RED}$1${CLR}"
+}
+
+# Function to prompt user for confirmation
+confirm() {
+  read -r -p "$1 [y/N]: " response
+  case "$response" in
+    [yY][eE][sS] | [yY])
+      true
+      ;;
+    *)
+      false
+      ;;
+  esac
+}
+
+# --- Script Arguments ---
+if [ $# -lt 1 ]; then
+  error "Usage: $0 <site_name>"
+  exit 1
+fi
+
+site_name="$1"
+domain_name="$site_name"  # Assuming site_name is the domain name
+
+# Header
+echo -e "${BOLD}Removing site from droplet${CLR}"
+printf '%s
+' "⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯"
+echo -e "Site: $site_name"
+printf '%s
+' "⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯"
+echo ""
+
+# Confirm removal
+if ! confirm "Are you sure you want to remove site $domain_name"; then
+  info "Aborting removal."
+  exit 0
+fi
+
+# --- Check if running as root ---
+if [[ $EUID -ne 0 ]]; then
+  error "This script must be run as root."
+  exit 1
+fi
+
+# Define file paths
+vhost_file="/etc/nginx/sites-available/$domain_name"
+vhost_symlink="/etc/nginx/sites-enabled/$domain_name"
+service_file="/etc/systemd/system/$domain_name.service"
+
+# --- Remove Systemd Service ---
+if [ -f "$service_file" ]; then
+  info "Stopping Systemd service for $domain_name..."
+  sudo systemctl stop "$domain_name" &>/dev/null
+  sudo systemctl disable "$domain_name" &>/dev/null
+  rm_cmd="sudo rm -f \"$service_file\""
+  eval $rm_cmd
+  sudo systemctl daemon-reload
+  success "Systemd service for $domain_name removed"
+else
+  warning "No Systemd service file found for $domain_name"
+fi
+
+# --- Remove Nginx Configuration ---
+if [ -L "$vhost_symlink" ]; then
+  sudo rm -f "$vhost_symlink"
+  success "Removed nginx symlink $vhost_symlink"
+else
+  warning "No nginx symlink found at $vhost_symlink"
+fi
+
+if [ -f "$vhost_file" ]; then
+  sudo rm -f "$vhost_file"
+  success "Removed nginx site file $vhost_file"
+else
+  warning "No nginx site file found at $vhost_file"
+fi
+
+# Reload Nginx
+sudo nginx -t &>/dev/null
+if [ $? -ne 0 ]; then
+  error "Nginx configuration test failed after removal. Please check manually."
+  exit 1
+fi
+sudo systemctl restart nginx
+success "Nginx restarted"
+
+# --- Remove SSL Certificate ---
+if command -v certbot &>/dev/null; then
+  if confirm "Do you want to remove the SSL certificate for $domain_name?"; then
+    echo -e "${YELLOW}Removing SSL certificate for $domain_name...${CLR}"
+    sudo certbot delete --cert-name "$domain_name"
+    if [ $? -eq 0 ]; then
+      success "SSL certificate for $domain_name removed"
+    else
+      error "Failed to remove SSL certificate for $domain_name"
+    fi
+  else
+    info "Skipping SSL certificate removal."
+  fi
+fi
+
+# Final message
+echo -e "\nAll steps completed! The site $domain_name has been removed. Happy coding!"
